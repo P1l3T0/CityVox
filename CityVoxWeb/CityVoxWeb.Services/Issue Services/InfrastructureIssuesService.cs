@@ -1,8 +1,13 @@
 ﻿using AutoMapper;
 using CityVoxWeb.Data;
 using CityVoxWeb.Data.Models.IssueEntities;
+using CityVoxWeb.Data.Models.IssueEntities.Enumerators.Emergency;
+using CityVoxWeb.Data.Models.IssueEntities.Enumerators.InfIssue;
+using CityVoxWeb.Data.Models.IssueEntities.Enumerators.Report;
 using CityVoxWeb.DTOs.Issues.InfIssues;
 using CityVoxWeb.Services.Interfaces;
+using CityVoxWeb.Services.User_Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -18,12 +23,17 @@ namespace CityVoxWeb.Services.Issue_Services
         private readonly CityVoxDbContext _dbContext;
         private readonly IMapper _mapper;
         private readonly INotificationService _notificationService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IUsersService _usersService;
 
-        public InfrastructureIssuesService(CityVoxDbContext dbContext, IMapper mapper, INotificationService notificationService)
+        public InfrastructureIssuesService(CityVoxDbContext dbContext, IMapper mapper, INotificationService notificationService,
+            IHttpContextAccessor httpContextAccessor, IUsersService usersService)
         {
             _dbContext = dbContext;
             _mapper = mapper;
             _notificationService = notificationService;
+            _httpContextAccessor = httpContextAccessor;
+            _usersService = usersService;
         }
 
         public async Task<ExportInfIssueDto> CreateAsync(CreateInfIssueDto createInfIssueDto)
@@ -53,8 +63,23 @@ namespace CityVoxWeb.Services.Issue_Services
                     .FirstOrDefaultAsync(i => i.Id.ToString() == infIssueId)
                     ?? throw new Exception("Invalid id!");
 
+                var status = (InfrastructureIssueStatus)updateInfIssueDto.Status;
+
+                var userId = this._httpContextAccessor.HttpContext!.User.FindFirst(claim => claim.Type.Equals("id"))?.Value;
+
+                var user = await _usersService.GetUserAsync(userId!);
+
                 _mapper.Map(updateInfIssueDto, infIssue);
                 //await _dbContext.SaveChangesAsync();
+
+
+                if (!(status == InfrastructureIssueStatus.Reported))
+                {
+                    if (!user.Role.Equals("Admin"))
+                    {
+                        infIssue.Status = InfrastructureIssueStatus.Reported;
+                    }
+                }
 
                 await _notificationService.CreateNotificationForInfrastructureIssueAsync(updateInfIssueDto.Status, "infIssue", infIssue);
                 var exportInfIssueDto = _mapper.Map<ExportInfIssueDto>(infIssue);

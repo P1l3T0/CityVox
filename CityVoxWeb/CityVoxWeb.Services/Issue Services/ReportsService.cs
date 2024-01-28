@@ -70,7 +70,7 @@ namespace CityVoxWeb.Services.Issue_Services
                 _mapper.Map(reportDto, report);
                 //await _dbContext.SaveChangesAsync();
 
-                if ((status == ReportStatus.Approved))
+                if (!(status == ReportStatus.Reported))
                 {
                     if (!user.Role.Equals("Admin"))
                     {

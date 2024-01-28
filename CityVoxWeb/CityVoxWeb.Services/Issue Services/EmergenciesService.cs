@@ -1,8 +1,12 @@
 ﻿using AutoMapper;
 using CityVoxWeb.Data;
 using CityVoxWeb.Data.Models.IssueEntities;
+using CityVoxWeb.Data.Models.IssueEntities.Enumerators.Emergency;
+using CityVoxWeb.Data.Models.IssueEntities.Enumerators.Report;
 using CityVoxWeb.DTOs.Issues.Emergencies;
 using CityVoxWeb.Services.Interfaces;
+using CityVoxWeb.Services.User_Services;
+using Microsoft.AspNetCore.Http;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -18,12 +22,18 @@ namespace CityVoxWeb.Services.Issue_Services
         private readonly CityVoxDbContext _dbContext;
         private readonly IMapper _mapper;
         private readonly INotificationService _notificationService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IUsersService _usersService;
 
-        public EmergenciesService(CityVoxDbContext dbContext, IMapper mapper, INotificationService notificationService)
+        public EmergenciesService(CityVoxDbContext dbContext, IMapper mapper, INotificationService notificationService,
+            IHttpContextAccessor httpContextAccessor, IUsersService usersService)
         {
             _dbContext = dbContext;
             _mapper = mapper;
             _notificationService = notificationService;
+            _httpContextAccessor = httpContextAccessor;
+            _usersService = usersService;
+            
         }
         public async Task<ExportEmergencyDto> CreateAsync(CreateEmergencyDto createEmergencyDto)
         {
@@ -70,8 +80,22 @@ namespace CityVoxWeb.Services.Issue_Services
                     .FirstOrDefaultAsync(e => e.Id.ToString() == emergencyId)
                     ?? throw new Exception("Invalid id!");
 
+                var status = (EmergencyStatus)emergencyDto.Status;
+
+                var userId = this._httpContextAccessor.HttpContext!.User.FindFirst(claim => claim.Type.Equals("id"))?.Value;
+
+                var user = await _usersService.GetUserAsync(userId!);
+
                 _mapper.Map(emergencyDto, emergency);
                 //await _dbContext.SaveChangesAsync();
+
+                if (!(status == EmergencyStatus.Reported))
+                {
+                    if (!user.Role.Equals("Admin"))
+                    {
+                        emergency.Status = EmergencyStatus.Reported;
+                    }
+                }
 
                 await _notificationService.CreateNotificationForEmergencyAsync(emergencyDto.Status, "emergency", emergency);
                 var exportEmergencyDto = _mapper.Map<ExportEmergencyDto>(emergency);
