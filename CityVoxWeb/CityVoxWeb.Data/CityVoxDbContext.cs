@@ -7,6 +7,7 @@ using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore;
 using System.Reflection;
+using CityVoxWeb.Data.Models.IssueEntities.Pending;
 
 namespace CityVoxWeb.Data
 {
@@ -18,6 +19,7 @@ namespace CityVoxWeb.Data
         }
 
         public DbSet<Report> Reports { get; set; } = null!;
+        public DbSet<PendingReport> PendingReports { get; set; } = null!;
         public DbSet<InfrastructureIssue> InfrastructureIssues { get; set; } = null!;
         public DbSet<Emergency> Emergencies { get; set; } = null!;
         public DbSet<Notification> Notifications { get; set; } = null!;

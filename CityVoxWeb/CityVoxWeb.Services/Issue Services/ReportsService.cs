@@ -1,8 +1,12 @@
 ﻿using AutoMapper;
 using CityVoxWeb.Data;
 using CityVoxWeb.Data.Models.IssueEntities;
+using CityVoxWeb.Data.Models.IssueEntities.Enumerators.Report;
+using CityVoxWeb.Data.Models.IssueEntities.Pending;
 using CityVoxWeb.DTOs.Issues.Reports;
 using CityVoxWeb.Services.Interfaces;
+using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using System;
 using System.Collections.Generic;
@@ -17,12 +21,17 @@ namespace CityVoxWeb.Services.Issue_Services
         private readonly CityVoxDbContext _dbContext;
         private readonly IMapper _mapper;
         private readonly INotificationService _notificationService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly IUsersService _usersService;
 
-        public ReportsService(CityVoxDbContext dbContext, IMapper mapper, INotificationService notificationService)
+        public ReportsService(CityVoxDbContext dbContext, IMapper mapper, INotificationService notificationService, IHttpContextAccessor httpContextAccessor,
+            IUsersService usersService)
         {
             _dbContext = dbContext;
             _mapper = mapper;
             _notificationService = notificationService;
+            _httpContextAccessor = httpContextAccessor;
+            _usersService = usersService;
         }
 
         public async Task<ExportReportDto> CreateAsync(CreateReportDto createReportDto)
@@ -52,11 +61,51 @@ namespace CityVoxWeb.Services.Issue_Services
                     .FirstOrDefaultAsync(r => r.Id.ToString() == reportId)
                     ?? throw new Exception("Invalid id!");
 
-                _mapper.Map(reportDto, report);               
-                //await _dbContext.SaveChangesAsync();
+                var status = (ReportStatus)reportDto.Status;
+
+                var userId = this._httpContextAccessor.HttpContext!.User.FindFirst(claim => claim.Type.Equals("id"))?.Value;
+
+                var user = await _usersService.GetUserAsync(userId!);
+
+                if ((status == ReportStatus.Approved) && user.Role.Equals("Admin")) // If admin edit the report status to approved
+                {
+                    var pendingReport = await _dbContext.PendingReports.FirstOrDefaultAsync(r => r.ReportId.ToString() == reportId) ?? null;
+
+                    if (pendingReport != null)
+                    {
+                        // TODO: Update the report in the database
+                        var updatedReport = _mapper.Map<Report>(pendingReport);
+
+                        report.Title = updatedReport.Title;
+                        report.Description = updatedReport.Description;
+                        report.ImageUrl = updatedReport.ImageUrl;
+                        report.Type = updatedReport.Type;
+                        report.Status = status;
+
+                        _dbContext.PendingReports.Remove(pendingReport);
+                        await _dbContext.SaveChangesAsync();
+                    }
+                }
+                else // If user edit the report
+                {
+                    var pendingReport = _mapper.Map<PendingReport>(reportDto);
+
+                    pendingReport.UserId = Guid.Parse(userId!);
+                    pendingReport.MunicipalityId = report.MunicipalityId;
+                    pendingReport.ReportId = report.Id;
+                    pendingReport.Status = ReportStatus.Reported;
+
+                    await _dbContext.PendingReports.AddAsync(pendingReport);
+                    await _dbContext.SaveChangesAsync();
+
+                    _dbContext.Reports.Remove(report);
+                    await _dbContext.SaveChangesAsync();
+                }
+
+                _mapper.Map(reportDto, report);
 
                 await _notificationService.CreateNotificationForReportAsync(reportDto.Status, "report", report);
-                await _dbContext.SaveChangesAsync();
+
                 var exportReportDto = _mapper.Map<ExportReportDto>(report);
                 return exportReportDto;
             }

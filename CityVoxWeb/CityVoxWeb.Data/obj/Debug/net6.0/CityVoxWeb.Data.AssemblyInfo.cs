@@ -14,7 +14,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("CityVoxWeb.Data")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+f788b385ab5b92d77108d1c5c768dcc73dae6c5d")]
 [assembly: System.Reflection.AssemblyProductAttribute("CityVoxWeb.Data")]
 [assembly: System.Reflection.AssemblyTitleAttribute("CityVoxWeb.Data")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
