@@ -67,45 +67,19 @@ namespace CityVoxWeb.Services.Issue_Services
 
                 var user = await _usersService.GetUserAsync(userId!);
 
-                if ((status == ReportStatus.Approved) && user.Role.Equals("Admin")) // If admin edit the report status to approved
+                _mapper.Map(reportDto, report);
+                //await _dbContext.SaveChangesAsync();
+
+                if ((status == ReportStatus.Approved))
                 {
-                    var pendingReport = await _dbContext.PendingReports.FirstOrDefaultAsync(r => r.ReportId.ToString() == reportId) ?? null;
-
-                    if (pendingReport != null)
+                    if (!user.Role.Equals("Admin"))
                     {
-                        // TODO: Update the report in the database
-                        var updatedReport = _mapper.Map<Report>(pendingReport);
-
-                        report.Title = updatedReport.Title;
-                        report.Description = updatedReport.Description;
-                        report.ImageUrl = updatedReport.ImageUrl;
-                        report.Type = updatedReport.Type;
-                        report.Status = status;
-
-                        _dbContext.PendingReports.Remove(pendingReport);
-                        await _dbContext.SaveChangesAsync();
+                        report.Status = ReportStatus.Reported;
                     }
                 }
-                else // If user edit the report
-                {
-                    var pendingReport = _mapper.Map<PendingReport>(reportDto);
-
-                    pendingReport.UserId = Guid.Parse(userId!);
-                    pendingReport.MunicipalityId = report.MunicipalityId;
-                    pendingReport.ReportId = report.Id;
-                    pendingReport.Status = ReportStatus.Reported;
-
-                    await _dbContext.PendingReports.AddAsync(pendingReport);
-                    await _dbContext.SaveChangesAsync();
-
-                    _dbContext.Reports.Remove(report);
-                    await _dbContext.SaveChangesAsync();
-                }
-
-                _mapper.Map(reportDto, report);
 
                 await _notificationService.CreateNotificationForReportAsync(reportDto.Status, "report", report);
-
+                await _dbContext.SaveChangesAsync();
                 var exportReportDto = _mapper.Map<ExportReportDto>(report);
                 return exportReportDto;
             }
